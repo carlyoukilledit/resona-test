@@ -27,17 +27,18 @@ st.markdown(
         background-color: #45a049;
     }
     </style>
-    """, 
+    """,
     unsafe_allow_html=True
 )
 
 # Streamlit interface
 st.title("Resona - Video to Audio")
-st.write("Upload a video file and the AI will create the audio for it.")
+st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
 
-# Step 1: Upload Your Video
-st.header("Step 1: Upload Your Video")
+# Step 1: Upload Your Video or Video Link
+st.header("Step 1: Upload Your Video or Video Link")
 uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
+video_link = st.text_input("Or enter a video link")
 
 # Step 2: Describe Your Video
 st.header("Step 2: Describe Your Video")
@@ -60,27 +61,34 @@ Tips for a helpful video description:
 st.header("Step 3: Submit")
 if st.button("Submit"):
     if uploaded_file is not None:
-        # Display details of the uploaded file
-        st.write("Filename:", uploaded_file.name)
-        st.write("File type:", uploaded_file.type)
-        st.write("File size:", uploaded_file.size, "bytes")
+        # Upload the file
+        files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+    elif video_link:
+        # Download the video from the link
+        response = requests.get(video_link)
+        if response.status_code == 200:
+            files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
+        else:
+            st.error(f"Failed to download video from link: {response.status_code}")
+            files = None
+    else:
+        st.warning("Please upload a file or provide a video link before submitting.")
+        files = None
 
+    if files is not None:
         # Show a loading spinner
-        with st.spinner("Uploading file..."):
-            # Function to upload the file
-            def upload_file(file, description):
-                files = {'file': (file.name, file.getvalue(), file.type)}
+        with st.spinner("Processing..."):
+            # Function to upload the file and description
+            def process_video(files, description):
                 data = {'description': description}
                 response = requests.post(url, files=files, data=data)
                 return response
 
-            # Upload the file
-            response = upload_file(uploaded_file, video_description)
+            # Process the video
+            response = process_video(files, video_description)
 
-            # Display the result of the upload
+            # Display the result of the processing
             if response.status_code == 200:
-                st.success(f"File successfully uploaded: {response.text}")
+                st.success(f"Video successfully processed: {response.text}")
             else:
-                st.error(f"File upload failed: {response.status_code} - {response.text}")
-    else:
-        st.warning("Please upload a file before submitting.")
+                st.error(f"Video processing failed: {response.status_code} - {response.text}")
