@@ -6,7 +6,6 @@ import json
 VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/igt"
 LOGIN_URL = "https://yuhezh.buildship.run/uval"
 CREDIT_CHECK_URL = "https://yuhezh.buildship.run/credd"
-CREDIT_DEDUCT_URL = "https://yuhezh.buildship.run/1credu"
 
 # Custom CSS
 st.markdown(
@@ -70,18 +69,12 @@ def check_credits(username):
             st.error("Error parsing credit information")
     return 0
 
-def deduct_credit(username):
-    response = api_call(CREDIT_DEDUCT_URL, params={"Username": username}, method='GET')
-    if response and response.status_code == 200:
-        try:
-            st.session_state.credits = int(response.text)
-            return True
-        except ValueError:
-            st.error("Error parsing credit information after deduction")
-    return False
-
-def process_video(files, description):
-    return api_call(VIDEO_PROCESSING_URL, files=files, data={'description': description}, method='POST')
+def process_video(files, description, username):
+    return api_call(VIDEO_PROCESSING_URL, 
+                    files=files, 
+                    data={'description': description}, 
+                    params={"Username": username},
+                    method='POST')
 
 def main():
     st.title("Resona - Video to Audio")
@@ -138,15 +131,14 @@ def main():
                 
                 if files:
                     with st.spinner("Processing..."):
-                        response = process_video(files, video_description)
+                        response = process_video(files, video_description, st.session_state.username)
                         if response and response.status_code == 200:
-                            if deduct_credit(st.session_state.username):
-                                st.success(f"Video successfully processed: {response.text}")
-                                st.write(f"You now have {st.session_state.credits} credits remaining.")
-                            else:
-                                st.error("Video was processed, but failed to deduct credit. Please contact support.")
+                            st.success(f"Video successfully processed: {response.text}")
+                            # Update credits after processing
+                            st.session_state.credits = check_credits(st.session_state.username)
+                            st.write(f"You now have {st.session_state.credits} credits remaining.")
                         else:
-                            st.error("Video processing failed. No credit was deducted. Please try again.")
+                            st.error("Video processing failed. Please try again.")
                 else:
                     st.warning("Please upload a file or provide a valid video link before submitting.")
             else:
