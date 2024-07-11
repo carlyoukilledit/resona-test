@@ -108,9 +108,8 @@ def main():
         st.write("""
         Tips for a helpful video description:
         * Provide a brief summary of the video's content.
-        * Mention important points or highlights in the video.
+        * Use the same prompt used to generate the video.
         * Describe any background music or sound effects.
-        * Specify the intended audience or context.
         """)
 
         st.header("Step 3: Submit")
