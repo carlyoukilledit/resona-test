@@ -40,12 +40,12 @@ if 'logged_in' not in st.session_state:
     st.session_state.username = ''
     st.session_state.credits = 0
 
-def api_call(url, params=None, json=None, files=None, data=None, method='GET'):
+def api_call(url, params=None, files=None, data=None, json=None, method='GET'):
     try:
         if method == 'GET':
             response = requests.get(url, params=params)
         elif method == 'POST':
-            response = requests.post(url, params=params, json=json, files=files, data=data)
+            response = requests.post(url, params=params, files=files, data=data, json=json)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as err:
