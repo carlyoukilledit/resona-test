@@ -71,7 +71,7 @@ def check_credits(username):
     return 0
 
 def deduct_credit(username):
-    response = api_call(CREDIT_DEDUCT_URL, json={"Username": username}, method='GET')
+    response = api_call(CREDIT_DEDUCT_URL, params={"Username": username}, method='GET')
     if response and response.status_code == 200:
         try:
             st.session_state.credits = int(response.text)
