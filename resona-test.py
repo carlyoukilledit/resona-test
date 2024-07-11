@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import json
 
 # Define the URLs
 VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/igt"
@@ -39,12 +40,12 @@ if 'logged_in' not in st.session_state:
     st.session_state.username = ''
     st.session_state.credits = 0
 
-def api_call(url, params=None, files=None, data=None, method='GET'):
+def api_call(url, params=None, json=None, files=None, data=None, method='GET'):
     try:
         if method == 'GET':
             response = requests.get(url, params=params)
         elif method == 'POST':
-            response = requests.post(url, params=params, files=files, data=data)
+            response = requests.post(url, params=params, json=json, files=files, data=data)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as err:
@@ -70,7 +71,7 @@ def check_credits(username):
     return 0
 
 def deduct_credit(username):
-    response = api_call(CREDIT_DEDUCT_URL, params={"Username": username})
+    response = api_call(CREDIT_DEDUCT_URL, json={"Username": username}, method='POST')
     if response and response.status_code == 200:
         try:
             st.session_state.credits = int(response.text)
