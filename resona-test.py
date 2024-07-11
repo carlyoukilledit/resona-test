@@ -5,8 +5,8 @@ import time
 # Define the URLs
 url = "https://yuhezh.buildship.run/igt"
 login_url = "https://yuhezh.buildship.run/uval"
-credit_url = "https://yuhezh.buildship.run/credd"
-deduct_credit_url = "https://yuhezh.buildship.run/1credu"
+credit_check_url = "https://yuhezh.buildship.run/credd"
+credit_deduct_url = "https://yuhezh.buildship.run/1credu"
 
 # Custom CSS for styling the submit button
 st.markdown(
@@ -42,10 +42,26 @@ if 'username' not in st.session_state:
 if 'credits' not in st.session_state:
     st.session_state.credits = 0
 
+# Error handling wrapper for API calls
+def api_call(url, params=None):
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        return response
+    except requests.exceptions.HTTPError as errh:
+        st.error(f"HTTP Error: {errh}")
+    except requests.exceptions.ConnectionError as errc:
+        st.error(f"Error Connecting: {errc}")
+    except requests.exceptions.Timeout as errt:
+        st.error(f"Timeout Error: {errt}")
+    except requests.exceptions.RequestException as err:
+        st.error(f"Something went wrong: {err}")
+    return None
+
 # Login function
 def login(username, password):
-    response = requests.get(f"{login_url}?Username={username}&Password={password}")
-    if response.status_code == 200:
+    response = api_call(login_url, params={"Username": username, "Password": password})
+    if response and response.status_code == 200:
         st.session_state.logged_in = True
         st.session_state.username = username
         st.session_state.credits = check_credits(username)
@@ -54,32 +70,26 @@ def login(username, password):
 
 # Check credits function
 def check_credits(username):
-    response = requests.get(f"{credit_url}?Username={username}")
-    if response.status_code == 200:
+    response = api_call(credit_check_url, params={"Username": username})
+    if response and response.status_code == 200:
         try:
             credits = int(response.text)
             return credits
         except ValueError:
             st.error("Error parsing credit information")
-            return 0
-    else:
-        st.error(f"Error checking credits: {response.status_code}")
-        return 0
+    return 0
 
 # Deduct credit function
 def deduct_credit(username):
-    response = requests.get(f"{deduct_credit_url}?Username={username}")
-    if response.status_code == 200:
+    response = api_call(credit_deduct_url, params={"Username": username})
+    if response and response.status_code == 200:
         try:
-            new_credit_balance = int(response.text)
-            st.session_state.credits = new_credit_balance
+            new_credits = int(response.text)
+            st.session_state.credits = new_credits
             return True
         except ValueError:
             st.error("Error parsing credit information after deduction")
-            return False
-    else:
-        st.error(f"Error deducting credit: {response.status_code}")
-        return False
+    return False
 
 # Login section
 if not st.session_state.logged_in:
@@ -134,11 +144,12 @@ if st.session_state.logged_in:
             if uploaded_file is not None:
                 files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
             elif video_link:
-                response = requests.get(video_link)
-                if response.status_code == 200:
+                try:
+                    response = requests.get(video_link)
+                    response.raise_for_status()
                     files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
-                else:
-                    st.error(f"Failed to download video from link: {response.status_code}")
+                except requests.exceptions.RequestException as err:
+                    st.error(f"Failed to download video from link: {err}")
                     files = None
             else:
                 st.warning("Please upload a file or provide a video link before submitting.")
@@ -147,20 +158,24 @@ if st.session_state.logged_in:
             if files is not None:
                 with st.spinner("Processing..."):
                     def process_video(files, description):
-                        data = {'description': description}
-                        response = requests.post(url, files=files, data=data)
-                        return response
+                        try:
+                            response = requests.post(url, files=files, data={'description': description})
+                            response.raise_for_status()
+                            return response
+                        except requests.exceptions.RequestException as err:
+                            st.error(f"Error processing video: {err}")
+                            return None
 
                     response = process_video(files, video_description)
 
-                    if response.status_code == 200:
+                    if response and response.status_code == 200:
                         if deduct_credit(st.session_state.username):
                             st.success(f"Video successfully processed: {response.text}")
                             st.write(f"You now have {st.session_state.credits} credits remaining.")
                         else:
-                            st.error("Failed to deduct credit. The video was processed, but credit deduction failed.")
+                            st.error("Failed to deduct credit. Please try again.")
                     else:
-                        st.error(f"Video processing failed: {response.status_code} - {response.text}")
+                        st.error("Video processing failed. Please try again.")
         else:
             st.error("You don't have enough credits to process this video.")
 
