@@ -6,6 +6,7 @@ import time
 url = "https://yuhezh.buildship.run/igt"
 login_url = "https://yuhezh.buildship.run/uval"
 credit_url = "https://yuhezh.buildship.run/credd"
+deduct_credit_url = "https://yuhezh.buildship.run/1credu"
 
 # Custom CSS for styling the submit button
 st.markdown(
@@ -67,13 +68,18 @@ def check_credits(username):
 
 # Deduct credit function
 def deduct_credit(username):
-    current_credits = check_credits(username)
-    if current_credits > 0:
-        # In a real application, you would make an API call to deduct the credit
-        # For now, we'll just update the session state
-        st.session_state.credits = current_credits - 1
-        return True
-    return False
+    response = requests.get(f"{deduct_credit_url}?Username={username}")
+    if response.status_code == 200:
+        try:
+            new_credit_balance = int(response.text)
+            st.session_state.credits = new_credit_balance
+            return True
+        except ValueError:
+            st.error("Error parsing credit information after deduction")
+            return False
+    else:
+        st.error(f"Error deducting credit: {response.status_code}")
+        return False
 
 # Login section
 if not st.session_state.logged_in:
@@ -152,7 +158,7 @@ if st.session_state.logged_in:
                             st.success(f"Video successfully processed: {response.text}")
                             st.write(f"You now have {st.session_state.credits} credits remaining.")
                         else:
-                            st.error("Failed to deduct credit. Please try again.")
+                            st.error("Failed to deduct credit. The video was processed, but credit deduction failed.")
                     else:
                         st.error(f"Video processing failed: {response.status_code} - {response.text}")
         else:
