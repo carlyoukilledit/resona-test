@@ -39,12 +39,12 @@ if 'logged_in' not in st.session_state:
     st.session_state.username = ''
     st.session_state.credits = 0
 
-def api_call(url, params=None, files=None, data=None, json=None, method='GET'):
+def api_call(url, params=None, files=None, data=None, json=None, headers=None, method='GET'):
     try:
         if method == 'GET':
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, headers=headers)
         elif method == 'POST':
-            response = requests.post(url, params=params, files=files, data=data, json=json)
+            response = requests.post(url, params=params, files=files, data=data, json=json, headers=headers)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as err:
@@ -70,11 +70,8 @@ def check_credits(username):
     return 0
 
 def process_video(files, description, username):
-    return api_call(VIDEO_PROCESSING_URL, 
-                    files=files, 
-                    data={'description': description}, 
-                    params={"Username": username},
-                    method='POST')
+    headers = {"Username": username}
+    return api_call(VIDEO_PROCESSING_URL, files=files, data={'description': description}, headers=headers, method='POST')
 
 def main():
     st.title("Resona - Video to Audio")
@@ -134,7 +131,6 @@ def main():
                         response = process_video(files, video_description, st.session_state.username)
                         if response and response.status_code == 200:
                             st.success(f"Video successfully processed: {response.text}")
-                            # Update credits after processing
                             st.session_state.credits = check_credits(st.session_state.username)
                             st.write(f"You now have {st.session_state.credits} credits remaining.")
                         else:
