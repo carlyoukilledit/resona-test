@@ -8,39 +8,7 @@ login_url = "https://yuhezh.buildship.run/uval"
 credit_check_url = "https://yuhezh.buildship.run/credd"
 credit_deduct_url = "https://yuhezh.buildship.run/1credu"
 
-# Custom CSS for styling the submit button
-st.markdown(
-    """
-    <style>
-    .stButton > button {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 26px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 33px;
-        margin: 10px 2px;
-        cursor: pointer;
-        border-radius: 12px;
-        border: none;
-        transition: background-color 0.3s;
-    }
-    .stButton > button:hover {
-        background-color: #45a049;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# Initialize session state
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-if 'username' not in st.session_state:
-    st.session_state.username = ''
-if 'credits' not in st.session_state:
-    st.session_state.credits = 0
+# ... (keep the CSS and session state initialization as before)
 
 # Error handling wrapper for API calls
 def api_call(url, params=None):
@@ -91,16 +59,7 @@ def deduct_credit(username):
             st.error("Error parsing credit information after deduction")
     return False
 
-# Login section
-if not st.session_state.logged_in:
-    st.header("Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if login(username, password):
-            st.success("Logged in successfully!")
-        else:
-            st.error("Invalid username or password")
+# ... (keep the login section as before)
 
 # Main application
 if st.session_state.logged_in:
@@ -127,14 +86,7 @@ if st.session_state.logged_in:
         height=100
     )
 
-    # Instructions for video description (below text area)
-    st.write("""
-    Tips for a helpful video description:
-    * Provide a brief summary of the video's content.
-    * Mention important points or highlights in the video.
-    * Describe any background music or sound effects.
-    * Specify the intended audience or context.
-    """)
+    # ... (keep the instructions as before)
 
     # Step 3: Submit
     st.header("Step 3: Submit")
@@ -169,13 +121,14 @@ if st.session_state.logged_in:
                     response = process_video(files, video_description)
 
                     if response and response.status_code == 200:
+                        # Deduct credit only after successful processing
                         if deduct_credit(st.session_state.username):
                             st.success(f"Video successfully processed: {response.text}")
                             st.write(f"You now have {st.session_state.credits} credits remaining.")
                         else:
-                            st.error("Failed to deduct credit. Please try again.")
+                            st.error("Video was processed, but failed to deduct credit. Please contact support.")
                     else:
-                        st.error("Video processing failed. Please try again.")
+                        st.error("Video processing failed. No credit was deducted. Please try again.")
         else:
             st.error("You don't have enough credits to process this video.")
 
