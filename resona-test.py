@@ -2,8 +2,10 @@ import streamlit as st
 import requests
 import time
 
-# Define the URL
+# Define the URLs
 url = "https://yuhezh.buildship.run/igt"
+login_url = "https://yuhezh.buildship.run/uval"
+credit_url = "https://yuhezh.buildship.run/credd"
 
 # Custom CSS for styling the submit button
 st.markdown(
@@ -31,64 +33,136 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Streamlit interface
-st.title("Resona - Video to Audio")
-st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
+# Initialize session state
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = ''
+if 'credits' not in st.session_state:
+    st.session_state.credits = 0
 
-# Step 1: Upload Your Video or Video Link
-st.header("Step 1: Upload Your Video or Video Link")
-uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
-video_link = st.text_input("Or enter a video link")
+# Login function
+def login(username, password):
+    response = requests.get(f"{login_url}?Username={username}&Password={password}")
+    if response.status_code == 200:
+        st.session_state.logged_in = True
+        st.session_state.username = username
+        st.session_state.credits = check_credits(username)
+        return True
+    return False
 
-# Step 2: Describe Your Video
-st.header("Step 2: Describe Your Video")
-video_description = st.text_area(
-    "Video Description",
-    placeholder="For example: This video contains a detailed tutorial on how to create a Streamlit app, demonstrating feature integration and best practices...",
-    height=100
-)
-
-# Instructions for video description (below text area)
-st.write("""
-Tips for a helpful video description:
-* Provide a brief summary of the video's content.
-* Mention important points or highlights in the video.
-* Describe any background music or sound effects.
-* Specify the intended audience or context.
-""")
-
-# Step 3: Submit
-st.header("Step 3: Submit")
-if st.button("Submit"):
-    if uploaded_file is not None:
-        # Upload the file
-        files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-    elif video_link:
-        # Download the video from the link
-        response = requests.get(video_link)
-        if response.status_code == 200:
-            files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
-        else:
-            st.error(f"Failed to download video from link: {response.status_code}")
-            files = None
+# Check credits function
+def check_credits(username):
+    response = requests.get(f"{credit_url}?Username={username}")
+    if response.status_code == 200:
+        try:
+            credits = int(response.text)
+            return credits
+        except ValueError:
+            st.error("Error parsing credit information")
+            return 0
     else:
-        st.warning("Please upload a file or provide a video link before submitting.")
-        files = None
+        st.error(f"Error checking credits: {response.status_code}")
+        return 0
 
-    if files is not None:
-        # Show a loading spinner
-        with st.spinner("Processing..."):
-            # Function to upload the file and description
-            def process_video(files, description):
-                data = {'description': description}
-                response = requests.post(url, files=files, data=data)
-                return response
+# Deduct credit function
+def deduct_credit(username):
+    current_credits = check_credits(username)
+    if current_credits > 0:
+        # In a real application, you would make an API call to deduct the credit
+        # For now, we'll just update the session state
+        st.session_state.credits = current_credits - 1
+        return True
+    return False
 
-            # Process the video
-            response = process_video(files, video_description)
+# Login section
+if not st.session_state.logged_in:
+    st.header("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if login(username, password):
+            st.success("Logged in successfully!")
+        else:
+            st.error("Invalid username or password")
 
-            # Display the result of the processing
-            if response.status_code == 200:
-                st.success(f"Video successfully processed: {response.text}")
+# Main application
+if st.session_state.logged_in:
+    st.title("Resona - Video to Audio")
+    st.write(f"Welcome, {st.session_state.username}! You have {st.session_state.credits} credits remaining.")
+
+    # Refresh credits button
+    if st.button("Refresh Credits"):
+        st.session_state.credits = check_credits(st.session_state.username)
+        st.success(f"Credits refreshed. You have {st.session_state.credits} credits.")
+
+    st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
+
+    # Step 1: Upload Your Video or Video Link
+    st.header("Step 1: Upload Your Video or Video Link")
+    uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
+    video_link = st.text_input("Or enter a video link")
+
+    # Step 2: Describe Your Video
+    st.header("Step 2: Describe Your Video")
+    video_description = st.text_area(
+        "Video Description",
+        placeholder="For example: This video contains a detailed tutorial on how to create a Streamlit app, demonstrating feature integration and best practices...",
+        height=100
+    )
+
+    # Instructions for video description (below text area)
+    st.write("""
+    Tips for a helpful video description:
+    * Provide a brief summary of the video's content.
+    * Mention important points or highlights in the video.
+    * Describe any background music or sound effects.
+    * Specify the intended audience or context.
+    """)
+
+    # Step 3: Submit
+    st.header("Step 3: Submit")
+    if st.button("Submit"):
+        current_credits = check_credits(st.session_state.username)
+        if current_credits > 0:
+            if uploaded_file is not None:
+                files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+            elif video_link:
+                response = requests.get(video_link)
+                if response.status_code == 200:
+                    files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
+                else:
+                    st.error(f"Failed to download video from link: {response.status_code}")
+                    files = None
             else:
-                st.error(f"Video processing failed: {response.status_code} - {response.text}")
+                st.warning("Please upload a file or provide a video link before submitting.")
+                files = None
+
+            if files is not None:
+                with st.spinner("Processing..."):
+                    def process_video(files, description):
+                        data = {'description': description}
+                        response = requests.post(url, files=files, data=data)
+                        return response
+
+                    response = process_video(files, video_description)
+
+                    if response.status_code == 200:
+                        if deduct_credit(st.session_state.username):
+                            st.success(f"Video successfully processed: {response.text}")
+                            st.write(f"You now have {st.session_state.credits} credits remaining.")
+                        else:
+                            st.error("Failed to deduct credit. Please try again.")
+                    else:
+                        st.error(f"Video processing failed: {response.status_code} - {response.text}")
+        else:
+            st.error("You don't have enough credits to process this video.")
+
+# Admin section (for demonstration purposes)
+if st.session_state.logged_in and st.session_state.username == 'admin':
+    st.header("Admin Section")
+    st.write("Note: This section is for demonstration purposes only. In a real application, you would implement secure admin functionality.")
+    target_user = st.text_input("Enter username to check credits")
+    if st.button("Check User Credits"):
+        user_credits = check_credits(target_user)
+        st.write(f"{target_user} has {user_credits} credits.")
