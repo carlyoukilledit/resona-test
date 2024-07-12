@@ -98,7 +98,6 @@ def main():
             st.session_state.credits = check_credits(st.session_state.username)
             st.success(f"Credits refreshed. You have {st.session_state.credits} credits.")
 
-        st.markdown("<div class='upload-section'>", unsafe_allow_html=True)
         st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
 
         uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
