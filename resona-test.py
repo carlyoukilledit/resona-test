@@ -145,17 +145,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
-
-The main changes in this revised code are:
-
-1. Added a new session state variable `video_processed` to keep track of whether a video has been processed.
-
-2. After successful video processing, we set `st.session_state.video_processed = True`.
-
-3. Added a new conditional block after the video processing section:
-
-```python
-if st.session_state.video_processed:
-    if st.button("Download Output"):
-        st.markdown('<a href="https://discord.gg/fbAn3f4QEj" target="_blank">Click here to download the output</a>', unsafe_allow_html=True)
