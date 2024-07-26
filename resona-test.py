@@ -105,7 +105,7 @@ def main():
         uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
         video_link = st.text_input("Or enter a video link")
 
-        description = st.text_input(" [**EXPERIMENTAL**] - Positive Keywords (optional)")
+        description = st.text_input("Positive Keywords (optional) - [**EXPERIMENTAL**]")
 
         if st.button("Process Video"):
             if st.session_state.credits > 0:
