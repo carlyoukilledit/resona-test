@@ -75,9 +75,10 @@ def check_credits(username):
             st.error("Error parsing credit information")
     return 0
 
-def process_video(files, username):
+def process_video(files, username, description):
     headers = {"Username": username}
-    return api_call(VIDEO_PROCESSING_URL, files=files, data={'description': ' '}, headers=headers, method='POST')
+    data = {'description': description if description else ' '}
+    return api_call(VIDEO_PROCESSING_URL, files=files, data=data, headers=headers, method='POST')
 
 def main():
     st.title("Resona - Video to Audio")
@@ -104,6 +105,8 @@ def main():
         uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
         video_link = st.text_input("Or enter a video link")
 
+        description = st.text_input("Enter positive keywords for generation (optional)")
+
         if st.button("Process Video"):
             if st.session_state.credits > 0:
                 files = None
@@ -118,7 +121,7 @@ def main():
                 
                 if files:
                     with st.spinner("Processing..."):
-                        response = process_video(files, st.session_state.username)
+                        response = process_video(files, st.session_state.username, description)
                         if response and response.status_code == 200:
                             st.success(f"Video successfully processed: {response.text}")
                             st.session_state.credits = check_credits(st.session_state.username)
