@@ -2,15 +2,12 @@ import streamlit as st
 import requests
 import os
 import uuid
-from google.cloud import storage
 
 # Define the URLs
 VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/upload-file"
 LOGIN_URL = "https://yuhezh.buildship.run/uval"
 CREDIT_CHECK_URL = "https://yuhezh.buildship.run/credd"
-
-# GCP Bucket ID
-GCP_BUCKET_ID = os.environ.get('GCP_BUCKET_ID')
+FILE_UPLOAD_URL = "https://transfer.sh/"  # We'll use transfer.sh as a temporary file host
 
 # Custom CSS
 st.markdown(
@@ -51,12 +48,14 @@ if 'logged_in' not in st.session_state:
     st.session_state.credits = 0
     st.session_state.video_processed = False
 
-def api_call(url, params=None, data=None, json=None, headers=None, method='GET'):
+def api_call(url, params=None, data=None, json=None, headers=None, method='GET', files=None):
     try:
         if method == 'GET':
             response = requests.get(url, params=params, headers=headers)
         elif method == 'POST':
-            response = requests.post(url, params=params, data=data, json=json, headers=headers)
+            response = requests.post(url, params=params, data=data, json=json, headers=headers, files=files)
+        elif method == 'PUT':
+            response = requests.put(url, data=data, headers=headers)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as err:
@@ -81,13 +80,13 @@ def check_credits(username):
             st.error("Error parsing credit information")
     return 0
 
-def upload_to_gcs(file):
-    client = storage.Client()
-    bucket = client.bucket(GCP_BUCKET_ID)
-    blob_name = f"{uuid.uuid4()}-{file.name}"
-    blob = bucket.blob(blob_name)
-    blob.upload_from_file(file)
-    return f"https://storage.googleapis.com/{GCP_BUCKET_ID}/{blob_name}"
+def upload_file(file):
+    filename = f"{uuid.uuid4()}-{file.name}"
+    headers = {'Content-Type': 'application/octet-stream'}
+    response = api_call(f"{FILE_UPLOAD_URL}/{filename}", data=file.getvalue(), headers=headers, method='PUT')
+    if response and response.status_code == 200:
+        return response.text.strip()  # The response contains the download URL
+    return None
 
 def process_video(video_link, username, description):
     headers = {"Username": username}
@@ -125,17 +124,20 @@ def main():
             if st.session_state.credits > 0:
                 if uploaded_file:
                     with st.spinner("Uploading file..."):
-                        video_link = upload_to_gcs(uploaded_file)
+                        video_link = upload_file(uploaded_file)
                     
-                    with st.spinner("Processing..."):
-                        response = process_video(video_link, st.session_state.username, description)
-                        if response and response.status_code == 200:
-                            st.success(f"Video successfully processed: {response.text}")
-                            st.session_state.credits = check_credits(st.session_state.username)
-                            st.write(f"You now have {st.session_state.credits} credits remaining.")
-                            st.session_state.video_processed = True
-                        else:
-                            st.error("Video processing failed. Please try again.")
+                    if video_link:
+                        with st.spinner("Processing..."):
+                            response = process_video(video_link, st.session_state.username, description)
+                            if response and response.status_code == 200:
+                                st.success(f"Video successfully processed: {response.text}")
+                                st.session_state.credits = check_credits(st.session_state.username)
+                                st.write(f"You now have {st.session_state.credits} credits remaining.")
+                                st.session_state.video_processed = True
+                            else:
+                                st.error("Video processing failed. Please try again.")
+                    else:
+                        st.error("Failed to upload the file. Please try again.")
                 else:
                     st.warning("Please upload a file before submitting.")
             else:
