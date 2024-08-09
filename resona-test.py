@@ -1,10 +1,16 @@
 import streamlit as st
 import requests
+import os
+import uuid
+from google.cloud import storage
 
 # Define the URLs
-VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/igt"
+VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/upload-file"
 LOGIN_URL = "https://yuhezh.buildship.run/uval"
 CREDIT_CHECK_URL = "https://yuhezh.buildship.run/credd"
+
+# GCP Bucket ID
+GCP_BUCKET_ID = os.environ.get('GCP_BUCKET_ID')
 
 # Custom CSS
 st.markdown(
@@ -45,12 +51,12 @@ if 'logged_in' not in st.session_state:
     st.session_state.credits = 0
     st.session_state.video_processed = False
 
-def api_call(url, params=None, files=None, data=None, json=None, headers=None, method='GET'):
+def api_call(url, params=None, data=None, json=None, headers=None, method='GET'):
     try:
         if method == 'GET':
             response = requests.get(url, params=params, headers=headers)
         elif method == 'POST':
-            response = requests.post(url, params=params, files=files, data=data, json=json, headers=headers)
+            response = requests.post(url, params=params, data=data, json=json, headers=headers)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as err:
@@ -75,10 +81,19 @@ def check_credits(username):
             st.error("Error parsing credit information")
     return 0
 
-def process_video(files, username, description):
+def upload_to_gcs(file):
+    client = storage.Client()
+    bucket = client.bucket(GCP_BUCKET_ID)
+    blob_name = f"{uuid.uuid4()}-{file.name}"
+    blob = bucket.blob(blob_name)
+    blob.upload_from_file(file)
+    return f"https://storage.googleapis.com/{GCP_BUCKET_ID}/{blob_name}"
+
+def process_video(video_link, username, description):
     headers = {"Username": username}
     data = {'description': description if description else ' '}
-    return api_call(VIDEO_PROCESSING_URL, files=files, data=data, headers=headers, method='POST')
+    params = {'video_link': video_link}
+    return api_call(VIDEO_PROCESSING_URL, params=params, data=data, headers=headers, method='POST')
 
 def main():
     st.title("Resona - Video to Audio")
@@ -100,28 +115,20 @@ def main():
             st.session_state.credits = check_credits(st.session_state.username)
             st.success(f"Credits refreshed. You have {st.session_state.credits} credits.")
 
-        st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
+        st.write("Upload a video file, and the AI will create the audio for it.")
 
         uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
-        video_link = st.text_input("Or enter a video link")
 
         description = st.text_input("Positive Keywords (optional) - [**EXPERIMENTAL**]")
 
         if st.button("Process Video"):
             if st.session_state.credits > 0:
-                files = None
                 if uploaded_file:
-                    files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                elif video_link:
-                    response = api_call(video_link, method='GET')
-                    if response:
-                        files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
-                    else:
-                        st.error("Failed to download video from link.")
-                
-                if files:
+                    with st.spinner("Uploading file..."):
+                        video_link = upload_to_gcs(uploaded_file)
+                    
                     with st.spinner("Processing..."):
-                        response = process_video(files, st.session_state.username, description)
+                        response = process_video(video_link, st.session_state.username, description)
                         if response and response.status_code == 200:
                             st.success(f"Video successfully processed: {response.text}")
                             st.session_state.credits = check_credits(st.session_state.username)
@@ -130,7 +137,7 @@ def main():
                         else:
                             st.error("Video processing failed. Please try again.")
                 else:
-                    st.warning("Please upload a file or provide a valid video link before submitting.")
+                    st.warning("Please upload a file before submitting.")
             else:
                 st.error("You don't have enough credits to process this video.")
 
