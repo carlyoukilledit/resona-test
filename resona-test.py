@@ -1,13 +1,10 @@
 import streamlit as st
 import requests
-import os
-import uuid
 
 # Define the URLs
-VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/upload-file"
+VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/igt"
 LOGIN_URL = "https://yuhezh.buildship.run/uval"
 CREDIT_CHECK_URL = "https://yuhezh.buildship.run/credd"
-FILE_UPLOAD_URL = "https://transfer.sh/"  # We'll use transfer.sh as a temporary file host
 
 # Custom CSS
 st.markdown(
@@ -48,14 +45,12 @@ if 'logged_in' not in st.session_state:
     st.session_state.credits = 0
     st.session_state.video_processed = False
 
-def api_call(url, params=None, data=None, json=None, headers=None, method='GET', files=None):
+def api_call(url, params=None, files=None, data=None, json=None, headers=None, method='GET'):
     try:
         if method == 'GET':
             response = requests.get(url, params=params, headers=headers)
         elif method == 'POST':
-            response = requests.post(url, params=params, data=data, json=json, headers=headers, files=files)
-        elif method == 'PUT':
-            response = requests.put(url, data=data, headers=headers)
+            response = requests.post(url, params=params, files=files, data=data, json=json, headers=headers)
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as err:
@@ -80,19 +75,10 @@ def check_credits(username):
             st.error("Error parsing credit information")
     return 0
 
-def upload_file(file):
-    filename = f"{uuid.uuid4()}-{file.name}"
-    headers = {'Content-Type': 'application/octet-stream'}
-    response = api_call(f"{FILE_UPLOAD_URL}/{filename}", data=file.getvalue(), headers=headers, method='PUT')
-    if response and response.status_code == 200:
-        return response.text.strip()  # The response contains the download URL
-    return None
-
-def process_video(video_link, username, description):
+def process_video(files, username, description):
     headers = {"Username": username}
     data = {'description': description if description else ' '}
-    params = {'video_link': video_link}
-    return api_call(VIDEO_PROCESSING_URL, params=params, data=data, headers=headers, method='POST')
+    return api_call(VIDEO_PROCESSING_URL, files=files, data=data, headers=headers, method='POST')
 
 def main():
     st.title("Resona - Video to Audio")
@@ -114,32 +100,37 @@ def main():
             st.session_state.credits = check_credits(st.session_state.username)
             st.success(f"Credits refreshed. You have {st.session_state.credits} credits.")
 
-        st.write("Upload a video file, and the AI will create the audio for it.")
+        st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
 
         uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
+        video_link = st.text_input("Or enter a video link")
 
         description = st.text_input("Positive Keywords (optional) - [**EXPERIMENTAL**]")
 
         if st.button("Process Video"):
             if st.session_state.credits > 0:
+                files = None
                 if uploaded_file:
-                    with st.spinner("Uploading file..."):
-                        video_link = upload_file(uploaded_file)
-                    
-                    if video_link:
-                        with st.spinner("Processing..."):
-                            response = process_video(video_link, st.session_state.username, description)
-                            if response and response.status_code == 200:
-                                st.success(f"Video successfully processed: {response.text}")
-                                st.session_state.credits = check_credits(st.session_state.username)
-                                st.write(f"You now have {st.session_state.credits} credits remaining.")
-                                st.session_state.video_processed = True
-                            else:
-                                st.error("Video processing failed. Please try again.")
+                    files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                elif video_link:
+                    response = api_call(video_link, method='GET')
+                    if response:
+                        files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
                     else:
-                        st.error("Failed to upload the file. Please try again.")
+                        st.error("Failed to download video from link.")
+                
+                if files:
+                    with st.spinner("Processing..."):
+                        response = process_video(files, st.session_state.username, description)
+                        if response and response.status_code == 200:
+                            st.success(f"Video successfully processed: {response.text}")
+                            st.session_state.credits = check_credits(st.session_state.username)
+                            st.write(f"You now have {st.session_state.credits} credits remaining.")
+                            st.session_state.video_processed = True
+                        else:
+                            st.error("Video processing failed. Please try again.")
                 else:
-                    st.warning("Please upload a file before submitting.")
+                    st.warning("Please upload a file or provide a valid video link before submitting.")
             else:
                 st.error("You don't have enough credits to process this video.")
 
