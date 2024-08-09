@@ -1,10 +1,12 @@
 import streamlit as st
 import requests
+import uuid
 
 # Define the URLs
-VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/igt"
+VIDEO_PROCESSING_URL = "https://yuhezh.buildship.run/upload-file"
 LOGIN_URL = "https://yuhezh.buildship.run/uval"
 CREDIT_CHECK_URL = "https://yuhezh.buildship.run/credd"
+FILE_UPLOAD_URL = "https://tmpfiles.org/api/v1/upload"
 
 # Custom CSS
 st.markdown(
@@ -75,10 +77,18 @@ def check_credits(username):
             st.error("Error parsing credit information")
     return 0
 
-def process_video(files, username, description):
+def upload_file_to_tmpfiles(file):
+    files = {'file': (file.name, file.getvalue(), file.type)}
+    response = api_call(FILE_UPLOAD_URL, files=files, method='POST')
+    if response and response.status_code == 200:
+        return response.json()['data']['url']
+    return None
+
+def process_video(video_link, username, description):
     headers = {"Username": username}
     data = {'description': description if description else ' '}
-    return api_call(VIDEO_PROCESSING_URL, files=files, data=data, headers=headers, method='POST')
+    params = {'video_link': video_link}
+    return api_call(VIDEO_PROCESSING_URL, params=params, data=data, headers=headers, method='POST')
 
 def main():
     st.title("Resona - Video to Audio")
@@ -109,19 +119,16 @@ def main():
 
         if st.button("Process Video"):
             if st.session_state.credits > 0:
-                files = None
                 if uploaded_file:
-                    files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                elif video_link:
-                    response = api_call(video_link, method='GET')
-                    if response:
-                        files = {'file': (video_link.split('/')[-1], response.content, 'video/mp4')}
-                    else:
-                        st.error("Failed to download video from link.")
+                    with st.spinner("Uploading file..."):
+                        video_link = upload_file_to_tmpfiles(uploaded_file)
+                        if not video_link:
+                            st.error("Failed to upload file.")
+                            return
                 
-                if files:
+                if video_link:
                     with st.spinner("Processing..."):
-                        response = process_video(files, st.session_state.username, description)
+                        response = process_video(video_link, st.session_state.username, description)
                         if response and response.status_code == 200:
                             st.success(f"Video successfully processed: {response.text}")
                             st.session_state.credits = check_credits(st.session_state.username)
