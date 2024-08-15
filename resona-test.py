@@ -143,7 +143,7 @@ def main():
 
         if st.session_state.video_processed:
             if st.button("Download Output"):
-                st.markdown('<a href="https://discord.gg/fbAn3f4QEj" target="_blank">Click here to download the output</a>', unsafe_allow_html=True)
+                st.markdown('<a href="https://discord.gg/4w4As3URZ9" target="_blank">Click here to download the output</a>', unsafe_allow_html=True)
 
         if st.session_state.username == 'admin':
             st.header("Admin Section")
