@@ -113,7 +113,6 @@ def main():
         st.write("Upload a video file or provide a video link, and the AI will create the audio for it.")
 
         uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "m4a"])
-        video_link = st.text_input("Or enter a video link")
 
         description = st.text_input("Positive Keywords (optional) - [**EXPERIMENTAL**]")
 
